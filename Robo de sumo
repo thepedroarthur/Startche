@@ -1,0 +1,198 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_MotorShield.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_PWMServoDriver.h>
+#include <SharpIR.h>
+
+// Pinos dos sensores QRE 1113
+#define QRE_PIN1 A0
+#define QRE_PIN2 A1
+
+// Pinos dos motores e encoder
+#define MOTOR1_PWM 9
+#define MOTOR1_DIR 8
+#define MOTOR2_PWM 11
+#define MOTOR2_DIR 10
+#define ENCODER1_A 2
+#define ENCODER1_B 3
+#define ENCODER2_A 4
+#define ENCODER2_B 5
+
+// Constantes de calibração dos sensores
+#define QRE_THRESHOLD 500
+
+// Pinos dos sensores de distância GP2Y0A21
+#define DISTANCE_PIN1 A2
+#define DISTANCE_PIN2 A3
+#define DISTANCE_PIN3 A4
+
+// Constantes para o controle dos motores
+#define MOTOR_SPEED 200
+#define MOTOR_DELAY 100
+
+// Distância de detecção da borda (ajuste conforme necessário)
+#define EDGE_DISTANCE_THRESHOLD 30
+
+// Objeto para controle dos motores
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *motor1 = AFMS.getMotor(1);
+Adafruit_DCMotor *motor2 = AFMS.getMotor(2);
+
+// Objetos para leitura dos sensores de distância
+SharpIR sensor1(DISTANCE_PIN1, 25, 93, 20150);
+SharpIR sensor2(DISTANCE_PIN2, 25, 93, 20150);
+SharpIR sensor3(DISTANCE_PIN3, 25, 93, 20150);
+
+// Função para inicializar o robô
+void setupRobot()
+{
+  AFMS.begin(); // Inicializa o controle dos motores
+
+  // Configuração dos pinos dos motores
+  pinMode(MOTOR1_DIR, OUTPUT);
+  pinMode(MOTOR2_DIR, OUTPUT);
+
+  // Configuração dos pinos dos encoders
+  pinMode(ENCODER1_A, INPUT);
+  pinMode(ENCODER1_B, INPUT);
+  pinMode(ENCODER2_A, INPUT);
+  pinMode(ENCODER2_B, INPUT);
+
+  // Inicializa a comunicação serial
+  Serial.begin(9600);
+}
+
+// Função para ler os sensores QRE 1113
+bool readQRESensors()
+{
+  int sensor1Value = analogRead(QRE_PIN1);
+  int sensor2Value = analogRead(QRE_PIN2);
+
+  if (sensor1Value < QRE_THRESHOLD && sensor2Value < QRE_THRESHOLD)
+  {
+    return true; // Os dois sensores estão em cima do ringue
+  }
+  else
+  {
+    return false; // Pelo menos um sensor está fora do ringue
+  }
+}
+
+// Função para verificar se o robô está próximo da borda
+bool isNearEdge()
+{
+  int distance1 = sensor1.getDistance();
+  int distance2 = sensor2.getDistance();
+  int distance3 = sensor3.getDistance();
+
+  if (distance1 < EDGE_DISTANCE_THRESHOLD ||
+      distance2 < EDGE_DISTANCE_THRESHOLD ||
+      distance3 < EDGE_DISTANCE_THRESHOLD)
+  {
+    return true; // Pelo menos um sensor está próximo da borda
+  }
+  else
+  {
+    return false; // Nenhum sensor está próximo da borda
+  }
+}
+
+// Função para mover o robô para frente
+void moveForward()
+{
+  digitalWrite(MOTOR1_DIR, HIGH);
+  digitalWrite(MOTOR2_DIR, HIGH);
+  motor1->setSpeed(MOTOR_SPEED);
+  motor2->setSpeed(MOTOR_SPEED);
+  motor1->run(FORWARD);
+  motor2->run(FORWARD);
+  delay(MOTOR_DELAY);
+}
+
+// Função para mover o robô para trás
+void moveBackward()
+{
+  digitalWrite(MOTOR1_DIR, LOW);
+  digitalWrite(MOTOR2_DIR, LOW);
+  motor1->setSpeed(MOTOR_SPEED);
+  motor2->setSpeed(MOTOR_SPEED);
+  motor1->run(BACKWARD);
+  motor2->run(BACKWARD);
+  delay(MOTOR_DELAY);
+}
+
+// Função para parar o robô
+void stopRobot()
+{
+  motor1->setSpeed(0);
+  motor2->setSpeed(0);
+  motor1->run(RELEASE);
+  motor2->run(RELEASE);
+  delay(MOTOR_DELAY);
+}
+
+// Função para girar o robô para a direita
+void turnRight()
+{
+  digitalWrite(MOTOR1_DIR, HIGH);
+  digitalWrite(MOTOR2_DIR, LOW);
+  motor1->setSpeed(MOTOR_SPEED);
+  motor2->setSpeed(MOTOR_SPEED);
+  motor1->run(FORWARD);
+  motor2->run(FORWARD);
+  delay(MOTOR_DELAY);
+}
+
+// Função para girar o robô para a esquerda
+void turnLeft()
+{
+  digitalWrite(MOTOR1_DIR, LOW);
+  digitalWrite(MOTOR2_DIR, HIGH);
+  motor1->setSpeed(MOTOR_SPEED);
+  motor2->setSpeed(MOTOR_SPEED);
+  motor1->run(FORWARD);
+  motor2->run(FORWARD);
+  delay(MOTOR_DELAY);
+}
+
+void loop()
+{
+  if (readQRESensors()) // Verifica se os sensores estão em cima do ringue
+  {
+    if (isNearEdge()) // Verifica se está próximo da borda
+    {
+      stopRobot(); // Para o robô
+    }
+    else
+    {
+      moveForward(); // Move para frente
+    }
+  }
+  else
+  {
+    stopRobot(); // Para o robô
+  }
+
+  // Realiza a leitura dos sensores de distância
+  int distance1 = sensor1.getDistance();
+  int distance2 = sensor2.getDistance();
+  int distance3 = sensor3.getDistance();
+
+  // Imprime as leituras na serial
+  Serial.print("Sensor 1: ");
+  Serial.println(distance1);
+  Serial.print("Sensor 2: ");
+  Serial.println(distance2);
+  Serial.print("Sensor 3: ");
+  Serial.println(distance3);
+
+  delay(100); // Aguarda um tempo antes de realizar a próxima leitura
+}
+
+void setup()
+{
+  setupRobot();
+}
+
+
